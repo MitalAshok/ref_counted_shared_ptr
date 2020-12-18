@@ -39,6 +39,7 @@ template struct make_private_member<boost::m_, &::boost::detail::sp_counted_base
 }
 #endif
 
+
 namespace ref_counted_shared_ptr {
 namespace detail {
 namespace boost {  // v ref_counted_shared_ptr::detail::boost
@@ -157,10 +158,13 @@ namespace boost {
 
 template<typename Self>
 struct ref_counted_shared_ptr : ::boost::enable_shared_from_this<Self> {
+protected:
     constexpr ref_counted_shared_ptr() noexcept = default;
     ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
 
     ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
+
+    ~ref_counted_shared_ptr() = default;
 
     long incref() const {
         crtp_checks();
@@ -200,10 +204,10 @@ struct ref_counted_shared_ptr : ::boost::enable_shared_from_this<Self> {
         return control_block->use_count();
     }
 
-    ::boost::weak_ptr<T> weak_from_this() noexcept {
+    ::boost::weak_ptr<Self> weak_from_this() noexcept {
         return ::ref_counted_shared_ptr::detail::boost::get_weak_ptr(*this);
     }
-    ::boost::weak_ptr<const T> weak_from_this() const noexcept {
+    ::boost::weak_ptr<const Self> weak_from_this() const noexcept {
         return ::ref_counted_shared_ptr::detail::boost::get_weak_ptr(*this);
     }
 private:

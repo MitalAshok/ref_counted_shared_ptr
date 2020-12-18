@@ -24,6 +24,7 @@ struct ::ref_counted_shared_ptr::detail::std::microsoft::defined_private_accesso
 
 #include "ref_counted_shared_ptr/impl/redefine_macro.h"
 
+
 namespace ref_counted_shared_ptr {
 namespace detail {
 namespace std {
@@ -78,10 +79,13 @@ namespace std {
 
 template<typename Self>
 struct ref_counted_shared_ptr : ::std::enable_shared_from_this<Self> {
+protected:
     constexpr ref_counted_shared_ptr() noexcept = default;
     ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
 
     ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
+
+    ~ref_counted_shared_ptr() = default;
 
     long incref() const {
         crtp_checks();
