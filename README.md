@@ -30,6 +30,10 @@ REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS(CInterface);
 
 ## Usage
 
+Include `ref_counted_shared_ptr/std.h` or `ref_counted_shared_ptr/boost.h` to use
+`ref_counted_shared_ptr::std::ref_counted_shared_ptr<T>` or `ref_counted_shared_ptr::boost::ref_counted_shared_ptr<T>`
+respectively.
+
 A type `T` must publicly inherit from `ref_counted_shared_ptr::std::ref_counted_shared_ptr<T>` (or
 `ref_counted_shared_ptr::boost::ref_counted_shared_ptr<T>` if using `boost::shared_ptr<T>` instead of
 `std::shared_ptr<T>`). This provides the member functions `incref`, `decref`, `use_count`, `shared_from_this`,
@@ -37,6 +41,12 @@ A type `T` must publicly inherit from `ref_counted_shared_ptr::std::ref_counted_
 
 Before instantiating any of these functions (by using them),
 `REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS(T)` must appear somewhere in the global scope (not in any namespace).
+
+Currently, `ref_counted_shared_ptr/std.h` supports:
+
+ * The GNU Standard C++ Library v3 (libstdc++ <https://gcc.gnu.org/onlinedocs/libstdc++/>)
+ * "libc++" C++ Standard Library (libc++ <https://libcxx.llvm.org/>)
+ * Microsoft's C++ Standard Library (<https://github.com/microsoft/STL>)
 
 ## Documentation
 
@@ -140,13 +150,13 @@ long incref() const;
 ```
 
 Accesses the private `weak_ptr<Self>` member and increments the reference
-count. Returns the current reference count after incrementing it.
+count. Returns the current reference count after incrementing it (will always be `> 1`).
 
 Must be paired with a call to `decref` afterwards to be able to deallocate `*this`. Before that,
 `*this` will be kept alive even if all `shared_ptr<Self>` objects of `this` are destroyed.
 
-Will throw `bad_weak_ptr` if the control block for `this` has not been allocated
-(equivalent to `this->use_count() == 0`). This can happen if `*this` was constructed via `new Self(...)` and
+Will throw `bad_weak_ptr` if the control block for `this` has not been allocated (which is when
+`this->use_count() == 0`). This can happen if `*this` was constructed via `new Self(...)` and
 never assigned to a `shared_ptr<Self>`, like:
 
 ```c++
@@ -178,7 +188,7 @@ long decref() const noexcept;
 ```
 
 Accesses the private `weak_ptr<Self>` member and decrements the reference count. Returns the
-current reference count after decrementing it.
+current reference count after decrementing it (will always be `>= 0`).
 
 Must have called `incref` at least once before, and there can only be one call to `decref` after every call
 to `incref`. If there isn't a corresponding call to `incref`, the behaviour is undefined.
@@ -195,7 +205,7 @@ long use_count() const noexcept;
 ```
 
 Returns an approximate value for the current reference count + the number of `shared_ptr<Self>` objects which
-refer to `*this`.
+refer to `*this`. Will always be `>= 0`.
 
 If this returns `0`, the value is also exact and `incref()` will throw (`this` has never been assigned to a
 `shared_ptr<Self>`, `this->weak_from_this()` will be empty).
@@ -204,8 +214,8 @@ In a non multi-threaded environment, this is always exact. It is only inexact wh
 to `incref`/`decref`/`shared_ptr<Self>::shared_ptr`/`shared_ptr<Self>::operator=` calls on other thread, which
 can affect the reference count.
 
-Equivalent to `this->weak_from_this().use_count()`. Similar to `this->shared_from_this().use_count() - 1` (other than
-the exception thrown if this would have been `0`).
+Equivalent to `this->weak_from_this().use_count()`. Similar to `this->shared_from_this().use_count() - 1` and
+`(this->incref(), this->decref())` (other than a `bad_weak_ref` exception).
 
 ### `weak_from_this`
 
