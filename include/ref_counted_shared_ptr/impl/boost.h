@@ -174,9 +174,8 @@ protected:
             return static_cast<long>(::ref_counted_shared_ptr::detail::boost::atomic_conditional_increment(::ref_counted_shared_ptr::detail::boost::get_count(*control_block), *control_block)) + 1;
         }
 
-        // First time. Create control block
-        ::boost::shared_ptr<const Self> s = this->shared_from_this();  // May throw
-        return static_cast<long>(::ref_counted_shared_ptr::detail::boost::atomic_conditional_increment(::ref_counted_shared_ptr::detail::boost::get_count(*control_block), *control_block));
+        static_cast<void>(::boost::shared_ptr<const Self>(::boost::weak_ptr<const Self>()));  // Throws bad_weak_ptr
+        return incref();
     }
 
     long decref() const noexcept {
@@ -204,6 +203,7 @@ protected:
         return control_block->use_count();
     }
 
+public:
     ::boost::weak_ptr<Self> weak_from_this() noexcept {
         return ::ref_counted_shared_ptr::detail::boost::get_weak_ptr(*this);
     }

@@ -95,9 +95,8 @@ protected:
             return _MT_INCR(::ref_counted_shared_ptr::detail::std::microsoft::get_count(*control_block));
         }
 
-        // First time. Create control block
-        ::std::shared_ptr<const Self> s = this->shared_from_this();  // May throw
-        return _MT_INCR(::ref_counted_shared_ptr::detail::std::microsoft::get_count(*control_block)) - 1;  // -1 for s
+        static_cast<void>(::std::shared_ptr<const Self>(::std::weak_ptr<const Self>()));  // Throws bad_weak_ptr
+        return incref();
     }
 
     long decref() const noexcept {
@@ -122,10 +121,11 @@ protected:
         return reinterpret_cast<volatile long&>(::ref_counted_shared_ptr::detail::std::microsoft::get_count(*control_block));
     }
 
-    ::std::weak_ptr<T> weak_from_this() noexcept {
+public:
+    ::std::weak_ptr<Self> weak_from_this() noexcept {
         return ::ref_counted_shared_ptr::detail::std::microsoft::get_weak_ptr(*this);
     }
-    ::std::weak_ptr<const T> weak_from_this() const noexcept {
+    ::std::weak_ptr<const Self> weak_from_this() const noexcept {
         return ::ref_counted_shared_ptr::detail::std::microsoft::get_weak_ptr(*this);
     }
 private:

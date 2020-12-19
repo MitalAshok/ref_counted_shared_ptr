@@ -16,3 +16,6 @@ target_sources(ref_counted_shared_ptr INTERFACE
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/ref_counted_shared_ptr.h
 )
 target_include_directories(ref_counted_shared_ptr INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include/)
+
+add_executable(ref_counted_shared_ptr_sample ${CMAKE_CURRENT_LIST_DIR}/sample/sample.cpp)
+target_link_libraries(ref_counted_shared_ptr_sample PRIVATE ref_counted_shared_ptr)

@@ -111,11 +111,8 @@ protected:
             return new_count + 1;
         }
 
-        // First time. Create control block
-        ::std::shared_ptr<const Self> s = this->shared_from_this();  // May throw
-        long& count = ::ref_counted_shared_ptr::detail::std::libcxx::get_count(*control_block);
-        long new_count = ::std::__libcpp_atomic_refcount_increment(count);
-        return new_count;  // No +1 for s
+        static_cast<void>(::std::shared_ptr<const Self>(::std::weak_ptr<const Self>()));  // Throws bad_weak_ptr
+        return incref();
     }
 
     long decref() const noexcept {
@@ -141,6 +138,7 @@ protected:
         return control_block->use_count();
     }
 
+public:
     ::std::weak_ptr<Self> weak_from_this() noexcept {
         return ::ref_counted_shared_ptr::detail::std::libcxx::get_weak_ptr(*this);
     }
