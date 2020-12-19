@@ -11,18 +11,18 @@
 
 #define REF_COUNTED_SHARED_PTR_BOOST
 #define REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_BOOST(...)           \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<       \
+template struct ref_counted_shared_ptr::detail::make_private_member<         \
     ::ref_counted_shared_ptr::detail::boost::weak_this_< __VA_ARGS__ >,      \
     &::boost::enable_shared_from_this< __VA_ARGS__ >::weak_this_             \
 >;                                                                           \
                                                                              \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<       \
+template struct ref_counted_shared_ptr::detail::make_private_member<         \
     ::ref_counted_shared_ptr::detail::boost::pn< __VA_ARGS__ >,              \
     &::boost::weak_ptr< __VA_ARGS__ >::pn                                    \
 >;                                                                           \
                                                                              \
 template<>                                                                   \
-struct ::ref_counted_shared_ptr::detail::boost::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
+struct ref_counted_shared_ptr::detail::boost::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
 
 #include "ref_counted_shared_ptr/impl/redefine_macro.h"
 

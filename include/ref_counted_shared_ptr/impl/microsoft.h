@@ -9,18 +9,18 @@
 #define REF_COUNTED_SHARED_PTR_STD WINDOWS
 #define REF_COUNTED_SHARED_PTR_STD_WINDOWS
 #define REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(...)             \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<       \
+template struct ref_counted_shared_ptr::detail::make_private_member<         \
     ::ref_counted_shared_ptr::detail::std::microsoft::_wptr< __VA_ARGS__ >,  \
     &::std::enable_shared_from_this< __VA_ARGS__ >::_Wptr                    \
 >;                                                                           \
                                                                              \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<       \
+template struct ref_counted_shared_ptr::detail::make_private_member<         \
     ::ref_counted_shared_ptr::detail::std::microsoft::_rep< __VA_ARGS__ >,   \
     &::std::_Ptr_base< __VA_ARGS__ >::_Rep                                   \
 >;                                                                           \
                                                                              \
 template<>                                                                   \
-struct ::ref_counted_shared_ptr::detail::std::microsoft::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
+struct ref_counted_shared_ptr::detail::std::microsoft::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
 
 #include "ref_counted_shared_ptr/impl/redefine_macro.h"
 

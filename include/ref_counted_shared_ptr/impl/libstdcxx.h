@@ -10,17 +10,17 @@
 #define REF_COUNTED_SHARED_PTR_STD LIBSTDCXX
 #define REF_COUNTED_SHARED_PTR_STD_LIBSTDCXX
 #define REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(...)                    \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<              \
+template struct ref_counted_shared_ptr::detail::make_private_member<                \
     ::ref_counted_shared_ptr::detail::std::libstdcxx::_m_weak_this< __VA_ARGS__ >,  \
     &::std::enable_shared_from_this< __VA_ARGS__ >::_M_weak_this                    \
 >;                                                                                  \
                                                                                     \
-template struct ::ref_counted_shared_ptr::detail::make_private_member<              \
+template struct ref_counted_shared_ptr::detail::make_private_member<                \
     ::ref_counted_shared_ptr::detail::std::libstdcxx::_m_refcount< __VA_ARGS__ >,   \
     &::std::__weak_ptr< __VA_ARGS__ >::_M_refcount                                  \
 >;                                                                                  \
                                                                                     \
-template<> struct ::ref_counted_shared_ptr::detail::std::libstdcxx::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
+template<> struct ref_counted_shared_ptr::detail::std::libstdcxx::defined_private_accessors< __VA_ARGS__ > : ::std::true_type {}
 
 #include "ref_counted_shared_ptr/impl/redefine_macro.h"
 
