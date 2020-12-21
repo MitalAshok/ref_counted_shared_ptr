@@ -65,7 +65,7 @@ protected:
 
     long incref() const;
 
-    long decref() const noexcept;
+    long decref() const;
 
     long use_count() const noexcept;
 
@@ -95,7 +95,7 @@ protected:
 
     long incref() const;
 
-    long decref() const noexcept;
+    long decref() const;
 
     long use_count() const noexcept;
 
@@ -156,16 +156,13 @@ Must be paired with a call to `decref` afterwards to be able to deallocate `*thi
 `*this` will be kept alive even if all `shared_ptr<Self>` objects of `this` are destroyed.
 
 Will throw `bad_weak_ptr` if the control block for `this` has not been allocated (which is when
-`this->use_count() == 0`). This can happen if `*this` was constructed via `new Self(...)` and
-never assigned to a `shared_ptr<Self>`, like:
+`this->use_count() == 0`). This means that `incref` cannot be called inside the constructor of `Self`.
+It also means that `this` has to be assigned to a `shared_ptr` at least once before, and this will throw:
 
 ```c++
 T* t = new T;
 t->incref();  // Throws `std::bad_weak_ptr`
 ```
-
-The only other case this can happen is if `incref` is called from within the constructor for `*this`.
-This is not allowed for the same reason `shared_from_this` is not allowed to be called in the same context.
 
 When an exceptions is thrown, the reference count is unaffected and nothing happens to `*this`.
 
@@ -184,7 +181,7 @@ T* t;
 
 ```c++
 protected:
-long decref() const noexcept;
+long decref() const;
 ```
 
 Accesses the private `weak_ptr<Self>` member and decrements the reference count. Returns the
@@ -195,7 +192,7 @@ to `incref`. If there isn't a corresponding call to `incref`, the behaviour is u
 
 If `incref` had been called `n` times before, and this is the `n`th time calling `decref`,
 and there are no `shared_ptr<Self>` objects which own `*this`, `*this` is destroyed and `0` is returned.
-The converse is also true: If `0` is returned, `*this` has been deleted.
+The converse is also true: If `0` is returned, `*this` has been destroyed.
 
 ### `use_count`
 
