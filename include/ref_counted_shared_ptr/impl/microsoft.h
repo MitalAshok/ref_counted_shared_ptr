@@ -28,113 +28,85 @@ struct ref_counted_shared_ptr::detail::std::microsoft::defined_private_accessors
 namespace ref_counted_shared_ptr {
 namespace detail {
 namespace std {
-namespace microsoft {  // v ref_counted_shared_ptr::detail::std::microsoft
-
-struct _uses : private_member<_uses, ::std::_Ref_count_base, ::std::_Atomic_counter_t> {};
-
-}
-}  // ^ ref_counted_shared_ptr::detail::std::microsoft, v ref_counted_shared_ptr::detail
-
-template struct make_private_member<std::microsoft::_uses, &::std::_Ref_count_base::_Uses>;
-
-}
-}  // ^ ref_counted_shared_ptr::detail, v ::
-
-
-namespace ref_counted_shared_ptr {
-namespace detail {
-namespace std {
-namespace microsoft {  // v ref_counted_shared_ptr::detail::std::microsoft
+namespace microsoft {
 
 template<typename T>
 struct _wptr : private_member<_wptr<T>, ::std::enable_shared_from_this<T>, ::std::weak_ptr<T>> {};
 template<typename T>
 struct _rep : private_member<_rep<T>, ::std::_Ptr_base<T>, ::std::_Ref_count_base*> {};
+struct _uses : private_member<_uses, ::std::_Ref_count_base, ::std::_Atomic_counter_t> {};
+
 template<typename T>
 struct defined_private_accessors : ::std::false_type {};
 
-template<typename T>
-::std::weak_ptr<T>& get_weak_ptr(const ::std::weak_ptr<T>& p) noexcept {
-    static_assert(defined_private_accessors<T>::value, "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()");
-
-    // const_cast is fine since _Wptr is mutable
-    return const_cast<::std::weak_ptr<T>&>(p.*_wptr<T>::get_value());
-}
-template<typename T>
-::std::_Ref_count_base*& get_control_block(const ::std::enable_shared_from_this<T>& p) noexcept {
-    return get_weak_ptr(p).*_rep<T>::get_value();
-}
-
-inline ::std::_Atomic_counter_t& get_count(::std::_Ref_count_base& control_block) noexcept {
-    return control_block.*_uses::get_value();
-}
-
 }
 }
 }
-}  // ^ ref_counted_shared_ptr::detail::std::microsoft, v ::
+}
 
 namespace ref_counted_shared_ptr {
+namespace detail {
+
+template struct make_private_member<std::microsoft::_uses, &::std::_Ref_count_base::_Uses>;
+
+}
+}
+
+namespace ref_counted_shared_ptr {
+namespace detail {
 namespace std {
 
-template<typename Self>
-struct ref_counted_shared_ptr : ::std::enable_shared_from_this<Self> {
-protected:
-    constexpr ref_counted_shared_ptr() noexcept = default;
-    ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
+struct implementation_information {
+    template<typename T> using shared_ptr = ::std::shared_ptr<T>;
+    template<typename T> using weak_ptr = ::std::weak_ptr<T>;
+    template<typename T> using enable_shared_from_this = ::std::enable_shared_from_this<T>;
 
-    ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
+    using control_block_type = ::std::_Ref_count_base;
+    using atomic_count_type = ::std::_Atomic_counter_t;
+    using regular_count_type = long;
 
-    ~ref_counted_shared_ptr() = default;
+    template<typename T>
+    static weak_ptr<T>& get_weak_ptr(const enable_shared_from_this<T>& p) noexcept {
+        static_assert(
+            ::ref_counted_shared_ptr::detail::std::microsoft::defined_private_accessors<T>::value,
+            "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()"
+        );
 
-    long incref() const {
-        crtp_checks();
-
-        ::std::_Ref_count_base*& control_block = ::ref_counted_shared_ptr::detail::std::microsoft::get_control_block(*this);
-        if (control_block) {
-            return _MT_INCR(::ref_counted_shared_ptr::detail::std::microsoft::get_count(*control_block));
-        }
-
-        static_cast<void>(::std::shared_ptr<const Self>(::std::weak_ptr<const Self>()));  // Throws bad_weak_ptr
-        return incref();
+        return const_cast<::std::weak_ptr<T>&>(p.*::ref_counted_shared_ptr::detail::std::microsoft::_wptr<T>::get_value());
     }
 
-    long decref() const noexcept {
-        crtp_checks();
+    template<typename T>
+    static control_block_type*& get_control_block(weak_ptr<T>& p) noexcept {
+        return p.*::ref_counted_shared_ptr::detail::std::microsoft::_rep<T>::get_value();
+    }
 
-        // Must have control block to call decref
-        ::std::_Ref_count_base& control_block = *::ref_counted_shared_ptr::detail::std::microsoft::get_control_block(*this);
-        ::std::_Atomic_counter_t& count = ::ref_counted_shared_ptr::detail::std::microsoft::get_count(control_block);
-        long new_count = _MT_DECR(count);
-        if (new_count != 0) return new_count;
+    static atomic_count_type& get_count(control_block_type& control_block) noexcept {
+        return control_block.*::ref_counted_shared_ptr::detail::std::microsoft::_uses::get_value();
+    }
 
-        // *this must be the only reference, so no race condition
-        _MT_INCR(count);
+    static long cast_count_to_long(regular_count_type count) {
+        return count;
+    }
+
+    static long get_use_count(control_block_type& control_block) noexcept {
+        return control_block._Use_count();
+    }
+
+    static regular_count_type increment_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return _MT_INCR(count);
+    }
+
+    static regular_count_type decrement_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return _MT_DECR(count);
+    }
+
+    static void on_zero_references(atomic_count_type&, control_block_type& control_block) noexcept {
+        control_block._Incref();
         control_block._Decref();
-        return 0;
-    }
-
-    long use_count() const noexcept {
-        crtp_checks();
-        ::std::_Ref_count_base* control_block = ::ref_counted_shared_ptr::detail::std::microsoft::get_control_block(*this);
-        if (!control_block) return 0;
-        return reinterpret_cast<volatile long&>(::ref_counted_shared_ptr::detail::std::microsoft::get_count(*control_block));
-    }
-
-public:
-    ::std::weak_ptr<Self> weak_from_this() noexcept {
-        return ::ref_counted_shared_ptr::detail::std::microsoft::get_weak_ptr(*this);
-    }
-    ::std::weak_ptr<const Self> weak_from_this() const noexcept {
-        return ::ref_counted_shared_ptr::detail::std::microsoft::get_weak_ptr(*this);
-    }
-private:
-    static constexpr bool crtp_checks() noexcept {
-        static_assert(::std::is_base_of<ref_counted_shared_ptr, Self>::value, "std::ref_counted_shared_ptr<Self>: Self must derive from std::ref_counted_shared_ptr<Self> for CRTP");
-        return true;
     }
 };
 
+}
 }
 }
 

@@ -46,114 +46,85 @@ struct defined_private_accessors : ::std::false_type {};
 
 }
 }
+}
+}
+
+namespace ref_counted_shared_ptr {
+namespace detail {
 
 template struct make_private_member<std::libcxx::_shared_owners_, &::std::__shared_count::__shared_owners_>;
 template struct make_private_member<std::libcxx::_on_zero_shared, &::std::__shared_count::__on_zero_shared>;
 
+}
+}
+
+namespace ref_counted_shared_ptr {
+namespace detail {
 namespace std {
-namespace libcxx {
 
-template<typename T>
-::std::weak_ptr<T>& get_weak_ptr(const ::std::enable_shared_from_this<T>& p) noexcept {
-    static_assert(defined_private_accessors<T>::value, "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()");
+struct implementation_information {
+    template<typename T> using shared_ptr = ::std::shared_ptr<T>;
+    template<typename T> using weak_ptr = ::std::weak_ptr<T>;
+    template<typename T> using enable_shared_from_this = ::std::enable_shared_from_this<T>;
 
-    return const_cast<::std::weak_ptr<T>&>(p.*_weak_this_<T>::get_value());
-}
+    using control_block_type = ::std::__shared_weak_count;
+    using atomic_count_type = long;
+    using regular_count_type = long;
 
-template<typename T>
-::std::__shared_weak_count*& get_control_block(const ::std::enable_shared_from_this<T>& p) noexcept {
-    return get_weak_ptr(p).*_cntrl_<T>::get_value();
-}
-
-// Cast to private base via C-style cast, so disable those warnings
+    static ::std::__shared_count& upcast_control_block(::std::__shared_weak_count& control_block) noexcept {
+        // Cast to private base via C-style cast, so disable those warnings
 #if defined(_LIBCPP_COMPILER_CLANG) || defined(_LIBCPP_COMPILER_GCC)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
-inline long& get_count(::std::__shared_weak_count& control_block) noexcept {
-    return ((::std::__shared_count&) control_block).*_shared_owners_::get_value();
-}
-
-inline void on_zero_shared(::std::__shared_weak_count& control_block) noexcept {
-    (((::std::__shared_count&) control_block).*_on_zero_shared::get_value())();
-}
+        return (::std::__shared_count&) control_block;
 #if defined(_LIBCPP_COMPILER_CLANG) || defined(_LIBCPP_COMPILER_GCC)
 #pragma GCC diagnostic pop
 #endif
-
-}
-}
-
-}
-}
-
-
-namespace ref_counted_shared_ptr {
-namespace std {
-
-template<typename Self>
-struct ref_counted_shared_ptr : ::std::enable_shared_from_this<Self> {
-protected:
-    constexpr ref_counted_shared_ptr() noexcept = default;
-    ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
-
-    ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
-
-    ~ref_counted_shared_ptr() = default;
-
-    long incref() const {
-        crtp_checks();
-
-        ::std::__shared_weak_count*& control_block = ::ref_counted_shared_ptr::detail::std::libcxx::get_control_block(*this);
-        if (control_block) {
-            long& count = ::ref_counted_shared_ptr::detail::std::libcxx::get_count(*control_block);
-            long new_count = ::std::__libcpp_atomic_refcount_increment(count);
-            return new_count + 1;
-        }
-
-        static_cast<void>(::std::shared_ptr<const Self>(::std::weak_ptr<const Self>()));  // Throws bad_weak_ptr
-        return incref();
     }
 
-    long decref() const noexcept {
-        crtp_checks();
+    template<typename T>
+    static weak_ptr<T>& get_weak_ptr(const enable_shared_from_this<T>& p) noexcept {
+        static_assert(
+            ::ref_counted_shared_ptr::detail::std::libcxx::defined_private_accessors<T>::value,
+            "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()"
+        );
 
-        // Must have control block to call decref
-        ::std::__shared_weak_count& control_block = *::ref_counted_shared_ptr::detail::std::libcxx::get_control_block(*this);
-        long& count = ::ref_counted_shared_ptr::detail::std::libcxx::get_count(control_block);
-        // libc++'s __shared_owners_ is offset by -1 (since it doesn't count +1 for weak pointers)
-        // so the new value after decrement still needs to add this one.
-        long new_count = ::std::__libcpp_atomic_refcount_decrement(count);
-        if (new_count != -1) return new_count + 1;
-
-        // Destroy shared object (*this) and deallocate if possible
-        ::ref_counted_shared_ptr::detail::std::libcxx::on_zero_shared(control_block);
-        return 0;
+        return const_cast<::std::weak_ptr<T>&>(p.*::ref_counted_shared_ptr::detail::std::libcxx::_weak_this_<T>::get_value());
     }
 
-    long use_count() const noexcept {
-        crtp_checks();
-        ::std::__shared_weak_count* control_block = ::ref_counted_shared_ptr::detail::std::libcxx::get_control_block(*this);
-        if (!control_block) return 0;
-        return control_block->use_count();
+    template<typename T>
+    static control_block_type*& get_control_block(weak_ptr<T>& p) noexcept {
+        return p.*::ref_counted_shared_ptr::detail::std::libcxx::_cntrl_<T>::get_value();
     }
 
-public:
-    ::std::weak_ptr<Self> weak_from_this() noexcept {
-        return ::ref_counted_shared_ptr::detail::std::libcxx::get_weak_ptr(*this);
+    static atomic_count_type& get_count(control_block_type& control_block) noexcept {
+        return upcast_control_block(control_block).*::ref_counted_shared_ptr::detail::std::libcxx::_shared_owners_::get_value();
     }
-    ::std::weak_ptr<const Self> weak_from_this() const noexcept {
-        return ::ref_counted_shared_ptr::detail::std::libcxx::get_weak_ptr(*this);
+
+    static long cast_count_to_long(regular_count_type count) {
+        return count + 1;
     }
-private:
-    static constexpr bool crtp_checks() noexcept {
-        static_assert(::std::is_base_of<ref_counted_shared_ptr, Self>::value, "std::ref_counted_shared_ptr<Self>: Self must derive from std::ref_counted_shared_ptr<Self> for CRTP");
-        return true;
+
+    static long get_use_count(control_block_type& control_block) noexcept {
+        return control_block.use_count();
+    }
+
+    static regular_count_type increment_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return ::std::__libcpp_atomic_refcount_increment(count);
+    }
+
+    static regular_count_type decrement_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return ::std::__libcpp_atomic_refcount_decrement(count);
+    }
+
+    static void on_zero_references(atomic_count_type&, control_block_type& control_block) noexcept {
+        (upcast_control_block(control_block).*::ref_counted_shared_ptr::detail::std::libcxx::_on_zero_shared::get_value())();
     }
 };
 
 }
 }
-
+}
 
 #endif  // REF_COUNTED_SHARED_PTR_LIBCXX_H_

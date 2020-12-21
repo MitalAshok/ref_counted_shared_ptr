@@ -42,98 +42,73 @@ struct defined_private_accessors : ::std::false_type {};
 
 }
 }
+}
+}
+
+namespace ref_counted_shared_ptr {
+namespace detail {
 
 template struct make_private_member<std::libstdcxx::_m_pi, &::std::__weak_count<>::_M_pi>;
 template struct make_private_member<std::libstdcxx::_m_use_count, &::std::_Sp_counted_base<>::_M_use_count>;
-
-namespace std {
-namespace libstdcxx {
-
-template<typename T>
-::std::weak_ptr<T>& get_weak_ptr(const ::std::enable_shared_from_this<T>& p) noexcept {
-    static_assert(defined_private_accessors<T>::value, "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()");
-
-    return const_cast<::std::weak_ptr<T>&>(p.*_m_weak_this<T>::get_value());
-}
-
-template<typename T>
-::std::_Sp_counted_base<>*& get_control_block(const ::std::enable_shared_from_this<T>& p) noexcept {
-    return get_weak_ptr(p).*_m_refcount<T>::get_value().*_m_pi::get_value();
-}
-
-inline ::_Atomic_word& get_count(::std::_Sp_counted_base<>& control_block) noexcept {
-    return control_block.*_m_use_count::get_value();
-}
-
-}
-}
 
 }
 }
 
 namespace ref_counted_shared_ptr {
+namespace detail {
 namespace std {
 
-template<typename Self>
-struct ref_counted_shared_ptr : ::std::enable_shared_from_this<Self> {
-protected:
-    constexpr ref_counted_shared_ptr() noexcept = default;
-    ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
+struct implementation_information {
+    template<typename T> using shared_ptr = ::std::shared_ptr<T>;
+    template<typename T> using weak_ptr = ::std::weak_ptr<T>;
+    template<typename T> using enable_shared_from_this = ::std::enable_shared_from_this<T>;
 
-    ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
+    using control_block_type = ::std::_Sp_counted_base<>;
+    using atomic_count_type = ::_Atomic_word;
+    using regular_count_type = long;
 
-    ~ref_counted_shared_ptr() = default;
+    template<typename T>
+    static weak_ptr<T>& get_weak_ptr(const enable_shared_from_this<T>& p) noexcept {
+        static_assert(
+            ::ref_counted_shared_ptr::detail::std::libstdcxx::defined_private_accessors<T>::value,
+            "std::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_STD(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()"
+        );
 
-    long incref() const {
-        crtp_checks();
-
-        ::std::_Sp_counted_base<>*& control_block = ::ref_counted_shared_ptr::detail::std::libstdcxx::get_control_block(*this);
-        if (control_block) {
-            ::_Atomic_word& count = ::ref_counted_shared_ptr::detail::std::libstdcxx::get_count(*control_block);
-            long old_count = __gnu_cxx::__exchange_and_add(&count, +1);
-            return old_count + 1;
-        }
-
-        static_cast<void>(::std::shared_ptr<const Self>(::std::weak_ptr<const Self>()));  // Throws bad_weak_ptr
-        return incref();
+        return const_cast<::std::weak_ptr<T>&>(p.*::ref_counted_shared_ptr::detail::std::libstdcxx::_m_weak_this<T>::get_value());
     }
 
-    long decref() const noexcept {
-        crtp_checks();
+    template<typename T>
+    static control_block_type*& get_control_block(weak_ptr<T>& p) noexcept {
+        return p.*::ref_counted_shared_ptr::detail::std::libstdcxx::_m_refcount<T>::get_value().*libstdcxx::_m_pi::get_value();
+    }
 
-        // Must have control block to call decref
-        ::std::_Sp_counted_base<>& control_block = *::ref_counted_shared_ptr::detail::std::libstdcxx::get_control_block(*this);
-        ::_Atomic_word& count = ::ref_counted_shared_ptr::detail::std::libstdcxx::get_count(control_block);
-        long old_count = __gnu_cxx::__exchange_and_add(&count, -1);
-        if (old_count != 1) return old_count - 1;
+    static atomic_count_type& get_count(control_block_type& control_block) noexcept {
+        return control_block.*::ref_counted_shared_ptr::detail::std::libstdcxx::_m_use_count::get_value();
+    }
 
-        // *this must be the only reference, so no race condition
+    static long cast_count_to_long(regular_count_type count) {
+        return count;
+    }
+
+    static long get_use_count(control_block_type& control_block) noexcept {
+        return control_block._M_get_use_count();
+    }
+
+    static regular_count_type increment_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return ::__gnu_cxx::__exchange_and_add(&count, +1) + 1;
+    }
+
+    static regular_count_type decrement_and_fetch(atomic_count_type& count, control_block_type&) noexcept {
+        return ::__gnu_cxx::__exchange_and_add(&count, -1) - 1;
+    }
+
+    static void on_zero_references(atomic_count_type&, control_block_type& control_block) noexcept {
         control_block._M_add_ref_copy();
         control_block._M_release();
-        return 0;
-    }
-
-    long use_count() const noexcept {
-        crtp_checks();
-        ::std::_Sp_counted_base<>* control_block = ::ref_counted_shared_ptr::detail::std::libstdcxx::get_control_block(*this);
-        if (!control_block) return 0;
-        return __atomic_load_n(&::ref_counted_shared_ptr::detail::std::libstdcxx::get_count(*control_block), __ATOMIC_RELAXED);
-    }
-
-public:
-    ::std::weak_ptr<Self> weak_from_this() noexcept {
-        return ::ref_counted_shared_ptr::detail::std::libstdcxx::get_weak_ptr(*this);
-    }
-    ::std::weak_ptr<const Self> weak_from_this() const noexcept {
-        return ::ref_counted_shared_ptr::detail::std::libstdcxx::get_weak_ptr(*this);
-    }
-private:
-    static constexpr bool crtp_checks() noexcept {
-        static_assert(::std::is_base_of<ref_counted_shared_ptr, Self>::value, "std::ref_counted_shared_ptr<Self>: Self must derive from std::ref_counted_shared_ptr<Self> for CRTP");
-        return true;
     }
 };
 
+}
 }
 }
 

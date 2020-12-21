@@ -19,17 +19,23 @@ struct test : ref_counted_shared_ptr::NS::ref_counted_shared_ptr<test> {
 REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS(test);
 
 int main() {
-    test* ptr;
-    {
 #define STR(X) #X
 #define TO_STR(X) STR(X)
+
+#ifdef REF_COUNTED_SHARED_PTR_STD
+    std::cout << "Using " TO_STR(REF_COUNTED_SHARED_PTR_STD) " <memory> implementation\n";
+#endif
+
+    test* ptr;
+    {
         std::cout << TO_STR(NS) "::make_shared<test>()\n";
         auto t = NS::make_shared<test>();
         ptr = t.get();
-        std::cout << "t.use_count(): " << t.use_count() << "\nt->use_count(): " << t->use_count() << "\nt->incref()\n";
-        t->incref();
-        std::cout << "t.use_count(): " << t.use_count() << "\nt->use_count(): " << t->use_count() << "\nshared_ptr<test>::~shared_ptr()\n";
+        std::cout << "t.use_count(): " << t.use_count() << "\nt->use_count(): " << t->use_count() << "\nt->incref(): ";
+        std::cout << t->incref();
+        std::cout << "\nt.use_count(): " << t.use_count() << "\nt->use_count(): " << t->use_count() << "\nshared_ptr<test>::~shared_ptr()\n";
     }
-    std::cout << "ptr->use_count(): " << ptr->use_count() << "\nptr->decref()\n";
-    ptr->decref();
+    std::cout << "ptr->use_count(): " << ptr->use_count() << "\nx = ptr->decref()\n";
+    long x = ptr->decref();
+    std::cout << "x: " << x << '\n';
 }

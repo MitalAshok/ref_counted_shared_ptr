@@ -7,6 +7,7 @@ add_library(ref_counted_shared_ptr INTERFACE)
 target_sources(ref_counted_shared_ptr INTERFACE
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/detail/access_private_member.h
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/impl/boost.h
+        ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/impl/common.h
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/impl/libcxx.h
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/impl/libstdcxx.h
         ${CMAKE_CURRENT_LIST_DIR}/include/ref_counted_shared_ptr/impl/microsoft.h

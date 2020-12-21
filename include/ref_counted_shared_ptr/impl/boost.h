@@ -28,27 +28,28 @@ struct ref_counted_shared_ptr::detail::boost::defined_private_accessors< __VA_AR
 
 
 #ifdef BOOST_SMART_PTR_DETAIL_SP_COUNTED_BASE_PT_HPP_INCLUDED
-namespace ref_counted_shared_ptr {
-namespace detail {
-namespace boost {
+namespace ref_counted_shared_ptr { namespace detail { namespace boost {
 struct m_ : private_member<m_, ::boost::detail::sp_counted_base, pthread_mutex_t> {};
-}
+}}}
 
+namespace ref_counted_shared_ptr { namespace detail {
 template struct make_private_member<boost::m_, &::boost::detail::sp_counted_base::m_>;
-}
-}
+}}
 #endif
 
 
 namespace ref_counted_shared_ptr {
 namespace detail {
-namespace boost {  // v ref_counted_shared_ptr::detail::boost
+namespace boost {
 
 template<typename T>
 struct weak_this_ : private_member<weak_this_<T>, ::boost::enable_shared_from_this<T>, ::boost::weak_ptr<T>> {};
 template<typename T>
 struct pn : private_member<pn<T>, ::boost::weak_ptr<T>, ::boost::detail::weak_count> {};
 
+// Most implementations of the control block use "::boost::detail::atomic_decrement"
+// and "::boost::detail::atomic_conditional_increment" to manipulate a member "use_count_".
+// Case on the ones that don't, then a general case for the rest.
 #if defined(BOOST_SMART_PTR_DETAIL_SP_COUNTED_BASE_NT_HPP_INCLUDED)
 using use_count_type = ::boost::int_least32_t;
 using non_atomic_use_count_type = use_count_type;
@@ -70,14 +71,15 @@ inline non_atomic_use_count_type atomic_decrement(use_count_type& pw, ::boost::d
     BOOST_VERIFY( pthread_mutex_lock(&ref_counter.*m_::get_value()) == 0 );
     use_count_type result = pw--;
     BOOST_VERIFY( pthread_mutex_unlock(&ref_counter.*m_::get_value()) == 0 );
+    return result;
 }
 
 inline non_atomic_use_count_type atomic_conditional_increment(use_count_type& pw, ::boost::detail::sp_counted_base& ref_counter) noexcept {
     BOOST_VERIFY( pthread_mutex_lock(&ref_counter.*m_::get_value()) == 0 );
-    long r = pw;
+    use_count_type r = pw;
     if (r != 0) ++pw;
-    return r;
     BOOST_VERIFY( pthread_mutex_unlock(&ref_counter.*m_::get_value()) == 0 );
+    return r;
 }
 #elif defined(BOOST_SMART_PTR_DETAIL_SP_COUNTED_BASE_W32_HPP_INCLUDED)
 using use_count_type = long;
@@ -125,98 +127,78 @@ inline non_atomic_use_count_type atomic_conditional_increment(use_count_type& pw
 
 struct pi_ : private_member<pi_, ::boost::detail::weak_count, ::boost::detail::sp_counted_base*> {};
 struct use_count_ : private_member<use_count_, ::boost::detail::sp_counted_base, use_count_type> {};
-}  // ^ ref_counted_shared_ptr::detail::boost, v ref_counted_shared_ptr::detail
-template struct make_private_member<boost::pi_, &::boost::detail::weak_count::pi_>;
-template struct make_private_member<boost::use_count_, &::boost::detail::sp_counted_base::use_count_>;
-namespace boost {  // ^ ref_counted_shared_ptr::detail, v ref_counted_shared_ptr::detail::boost
 
 template<typename T>
 struct defined_private_accessors : ::std::false_type {};
 
-template<typename T>
-::boost::weak_ptr<T>& get_weak_ptr(const ::boost::enable_shared_from_this<T>& p) noexcept {
-    static_assert(defined_private_accessors<T>::value, "boost::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_BOOST(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()");
-    // const_cast is fine since weak_this_ is mutable
-    return const_cast<::boost::weak_ptr<T>&>(p.*weak_this_<T>::get_value());
-}
-
-template<typename T>
-::boost::detail::sp_counted_base*& get_control_block(const ::boost::enable_shared_from_this<T>& p) noexcept {
-    return get_weak_ptr(p).*pn<T>::get_value().*pi_::get_value();
-}
-
-inline use_count_type& get_count(::boost::detail::sp_counted_base& control_block) noexcept {
-    return control_block.*use_count_::get_value();
-}
-
 }
 }
-}  // ^ ref_counted_shared_ptr::detail::boost, v ::
+}
 
 namespace ref_counted_shared_ptr {
+namespace detail {
+
+template struct make_private_member<boost::pi_, &::boost::detail::weak_count::pi_>;
+template struct make_private_member<boost::use_count_, &::boost::detail::sp_counted_base::use_count_>;
+
+}
+}
+
+namespace ref_counted_shared_ptr {
+namespace detail {
 namespace boost {
 
-template<typename Self>
-struct ref_counted_shared_ptr : ::boost::enable_shared_from_this<Self> {
-protected:
-    constexpr ref_counted_shared_ptr() noexcept = default;
-    ref_counted_shared_ptr(const ref_counted_shared_ptr&) noexcept = default;
+struct implementation_information {
+    template<typename T> using shared_ptr = ::boost::shared_ptr<T>;
+    template<typename T> using weak_ptr = ::boost::weak_ptr<T>;
+    template<typename T> using enable_shared_from_this = ::boost::enable_shared_from_this<T>;
 
-    ref_counted_shared_ptr& operator=(const ref_counted_shared_ptr&) noexcept = default;
+    using control_block_type = ::boost::detail::sp_counted_base;
+    using atomic_count_type = ::ref_counted_shared_ptr::detail::boost::use_count_type;
+    using regular_count_type = ::ref_counted_shared_ptr::detail::boost::non_atomic_use_count_type;
 
-    ~ref_counted_shared_ptr() = default;
+    template<typename T>
+    static weak_ptr<T>& get_weak_ptr(const enable_shared_from_this<T>& p) noexcept {
+        static_assert(
+            ::ref_counted_shared_ptr::detail::boost::defined_private_accessors<T>::value,
+            "boost::ref_counted_shared_ptr<Self>: Must have REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS_BOOST(Self) in the :: namespace scope at some point before attempting to use incref(), decref() or use_count()"
+        );
 
-    long incref() const {
-        crtp_checks();
-
-        ::boost::detail::sp_counted_base*& control_block = ::ref_counted_shared_ptr::detail::boost::get_control_block(*this);
-        if (control_block) {
-            return static_cast<long>(::ref_counted_shared_ptr::detail::boost::atomic_conditional_increment(::ref_counted_shared_ptr::detail::boost::get_count(*control_block), *control_block)) + 1;
-        }
-
-        static_cast<void>(::boost::shared_ptr<const Self>(::boost::weak_ptr<const Self>()));  // Throws bad_weak_ptr
-        return incref();
+        return const_cast<::boost::weak_ptr<T>&>(p.*::ref_counted_shared_ptr::detail::boost::weak_this_<T>::get_value());
     }
 
-    long decref() const noexcept {
-        crtp_checks();
-
-        // Must have control block to call decref
-        ::boost::detail::sp_counted_base& control_block = *::ref_counted_shared_ptr::detail::boost::get_control_block(*this);
-        ::ref_counted_shared_ptr::detail::boost::use_count_type& count = ::ref_counted_shared_ptr::detail::boost::get_count(control_block);
-        ::ref_counted_shared_ptr::detail::boost::non_atomic_use_count_type old_count = ::ref_counted_shared_ptr::detail::boost::atomic_decrement(count, control_block);
-
-        if (old_count == 1) {
-            // *this must be the only reference, so no race conditions
-            control_block.add_ref_copy();
-            control_block.release();
-            return 0;
-        }
-        return static_cast<long>(old_count - 1);
+    template<typename T>
+    static control_block_type*& get_control_block(weak_ptr<T>& p) noexcept {
+        return p.*pn<T>::get_value().*::ref_counted_shared_ptr::detail::boost::pi_::get_value();
     }
 
-    long use_count() const noexcept {
-        crtp_checks();
-
-        ::boost::detail::sp_counted_base* control_block = ::ref_counted_shared_ptr::detail::boost::get_control_block(*this);
-        if (!control_block) return 0;
-        return control_block->use_count();
+    static atomic_count_type& get_count(control_block_type& control_block) noexcept {
+        return control_block.*::ref_counted_shared_ptr::detail::boost::use_count_::get_value();
     }
 
-public:
-    ::boost::weak_ptr<Self> weak_from_this() noexcept {
-        return ::ref_counted_shared_ptr::detail::boost::get_weak_ptr(*this);
+    static long cast_count_to_long(regular_count_type count) {
+        return static_cast<long>(count);
     }
-    ::boost::weak_ptr<const Self> weak_from_this() const noexcept {
-        return ::ref_counted_shared_ptr::detail::boost::get_weak_ptr(*this);
+
+    static long get_use_count(control_block_type& control_block) noexcept {
+        return control_block.use_count();
     }
-private:
-    static constexpr bool crtp_checks() noexcept {
-        static_assert(::std::is_base_of<ref_counted_shared_ptr, Self>::value, "boost::ref_counted_shared_ptr<Self>: Self must derive from boost::ref_counted_shared_ptr<Self> for CRTP");
-        return true;
+
+    static regular_count_type increment_and_fetch(atomic_count_type& count, control_block_type& control_block) noexcept {
+        return ::ref_counted_shared_ptr::detail::boost::atomic_conditional_increment(count, control_block) + 1;
+    }
+
+    static regular_count_type decrement_and_fetch(atomic_count_type& count, control_block_type& control_block) noexcept {
+        return ::ref_counted_shared_ptr::detail::boost::atomic_decrement(count, control_block) - 1;
+    }
+
+    static void on_zero_references(atomic_count_type&, control_block_type& control_block) noexcept {
+        control_block.add_ref_copy();
+        control_block.release();
     }
 };
 
+}
 }
 }
 
