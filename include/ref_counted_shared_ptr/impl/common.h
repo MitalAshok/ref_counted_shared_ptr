@@ -9,7 +9,7 @@ namespace detail {
 
 template<typename ImplementationInformation>
 struct common_implementation {
-    // Required of Details:
+    // Required of ImplementationInformation:
 
     // template<typename T> using shared_ptr = NS::shared_ptr<T>;
     // template<typename T> using weak_ptr = NS::weak_ptr<T>;
@@ -121,12 +121,12 @@ struct common_implementation {
     }
 
     template<typename T>
-    static weak_ptr<T> weak_from_this(enable_shared_from_this<T>& p) noexcept {
+    static weak_ptr<T>& weak_from_this(enable_shared_from_this<T>& p) noexcept {
         return get_weak_ptr(p);
     }
 
     template<typename T>
-    static weak_ptr<const T> weak_from_this(const enable_shared_from_this<T>& p) noexcept {
+    static weak_ptr<const T>& weak_from_this(const enable_shared_from_this<T>& p) noexcept {
         return get_weak_ptr(p);
     }
 

@@ -16,7 +16,8 @@ struct test : ref_counted_shared_ptr::NS::ref_counted_shared_ptr<test> {
     using ref_counted_shared_ptr::decref;
 };
 
-REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS(test);
+// Only if inheriting from typed_ref_counted_shared_ptr
+// REF_COUNTED_SHARED_PTR_DEFINE_PRIVATE_ACCESSORS(test);
 
 int main() {
 #define STR(X) #X
