@@ -79,20 +79,20 @@ protected:
     using base::decref;
     using base::use_count;
 public:
-    ::boost::shared_ptr<Self> shared_from_this() noexcept {
+    ::boost::shared_ptr<Self> shared_from_this() {
         return static_cast<void>(crtp_checks()), ::boost::static_pointer_cast<Self>(::boost::shared_ptr<void>(base::weak_from_this()));
     }
 
-    ::boost::shared_ptr<const Self> shared_from_this() const noexcept {
+    ::boost::shared_ptr<const Self> shared_from_this() const {
         return static_cast<void>(crtp_checks()), ::boost::static_pointer_cast<const Self>(::boost::shared_ptr<const void>(base::weak_from_this()));
     }
 
     ::boost::weak_ptr<Self> weak_from_this() noexcept {
-        return this->shared_from_this();
+        return static_cast<void>(crtp_checks()), ::boost::static_pointer_cast<Self>(base::weak_from_this().lock());
     }
 
     ::boost::weak_ptr<const Self> weak_from_this() const noexcept {
-        return this->shared_from_this();
+        return static_cast<void>(crtp_checks()), ::boost::static_pointer_cast<const Self>(base::weak_from_this().lock());
     }
 };
 
